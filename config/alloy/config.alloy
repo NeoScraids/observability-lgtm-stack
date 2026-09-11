@@ -1,0 +1,50 @@
+// config.alloy: Local Alloy collector pipeline
+
+// -----------------------------------------------------------------------------
+// OpenTelemetry Tracing Pipeline (Receiver -> Batch -> Tempo)
+// -----------------------------------------------------------------------------
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Metrics Pipeline (Alloy Telemetry -> Mimir)
+// -----------------------------------------------------------------------------
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Log Pipeline (Loki Exporter)
+// -----------------------------------------------------------------------------
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

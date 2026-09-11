@@ -1,0 +1,137 @@
+version: "3.8"
+
+networks:
+  observability-net:
+    driver: bridge
+
+services:
+  # ============================================================================
+  # Grafana: Unified Visualization & Observability Hub
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: lgtm-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor,traceToProfiles,correlations
+    volumes:
+      - ./config/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./config/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./scripts/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - observability-net
+    depends_on:
+      - mimir
+      - loki
+      - tempo
+
+  # ============================================================================
+  # Prometheus: Real-time Metric Collector & Exporter
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: lgtm-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--enable-feature=remote-write-receiver"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - observability-net
+
+  # ============================================================================
+  # Mimir: Scalable Long-Term Metrics Storage
+  # ============================================================================
+  mimir:
+    image: grafana/mimir:2.12.0
+    container_name: lgtm-mimir
+    restart: unless-stopped
+    ports:
+      - "9009:9009"
+    command:
+      - "-config.file=/etc/mimir/mimir.yaml"
+    volumes:
+      - ./config/mimir/mimir.yaml:/etc/mimir/mimir.yaml:ro
+      - mimir_data:/data/mimir
+    networks:
+      - observability-net
+
+  # ============================================================================
+  # Loki: High-Efficiency Log Aggregation Engine
+  # ============================================================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: lgtm-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command:
+      - "-config.file=/etc/loki/loki-config.yaml"
+    volumes:
+      - ./config/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - observability-net
+
+  # ============================================================================
+  # Tempo: Distributed Tracing Backend (OTLP/gRPC/HTTP)
+  # ============================================================================
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: lgtm-tempo
+    restart: unless-stopped
+    ports:
+      - "3200:3200"   # Tempo HTTP API
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    command:
+      - "-config.file=/etc/tempo/tempo-config.yaml"
+    volumes:
+      - ./config/tempo/tempo-config.yaml:/etc/tempo/tempo-config.yaml:ro
+      - tempo_data:/tmp/tempo
+    networks:
+      - observability-net
+
+  # ============================================================================
+  # Grafana Alloy: Unified OpenTelemetry & Telemetry Collector
+  # ============================================================================
+  alloy:
+    image: grafana/alloy:v1.0.0
+    container_name: lgtm-alloy
+    restart: unless-stopped
+    ports:
+      - "12345:12345" # Alloy UI & Metrics
+    command:
+      - "run"
+      - "/etc/alloy/config.alloy"
+      - "--storage.path=/var/lib/alloy/data"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+    volumes:
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+    networks:
+      - observability-net
+    depends_on:
+      - loki
+      - tempo
+      - mimir
+
+volumes:
+  grafana_data:
+  prometheus_data:
+  mimir_data:
+  loki_data:
+  tempo_data:
+  alloy_data:

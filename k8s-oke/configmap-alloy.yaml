@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-agent-config
+  namespace: observability
+data:
+  config.alloy: |
+    // =========================================================================
+    // Grafana Alloy OKE DaemonSet Configuration
+    // Collects Kubernetes Node Logs, cAdvisor Metrics, and OTLP Traces
+    // =========================================================================
+
+    // 1. OTLP Receiver (Receives distributed traces from pods on the node)
+    otelcol.receiver.otlp "oke_pods" {
+      grpc {
+        endpoint = "0.0.0.0:4317"
+      }
+      http {
+        endpoint = "0.0.0.0:4318"
+      }
+
+      output {
+        traces = [otelcol.processor.batch.oke.input]
+      }
+    }
+
+    otelcol.processor.batch "oke" {
+      output {
+        traces = [otelcol.exporter.otlp.tempo_remote.input]
+      }
+    }
+
+    otelcol.exporter.otlp "tempo_remote" {
+      client {
+        endpoint = sys.env("TEMPO_ENDPOINT")
+        tls {
+          insecure = true
+        }
+      }
+    }
+
+    // 2. Discover Pod Log Files on Node (/var/log/pods)
+    local.file_match "pod_logs" {
+      path_targets = [{
+        __path__ = "/var/log/pods/*/*/*.log",
+      }]
+    }
+
+    loki.source.file "pod_logs" {
+      targets    = local.file_match.pod_logs.targets
+      forward_to = [loki.process.add_k8s_labels.receiver]
+    }
+
+    // 3. Extract Kubernetes Pod, Namespace, and Container metadata from log path
+    loki.process "add_k8s_labels" {
+      stage.regex {
+        expression = "/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>[^_]+)_(?P<pod_uid>[^/]+)/(?P<container>[^/]+)/.*\\.log"
+      }
+
+      stage.labels {
+        values = {
+          namespace = "",
+          pod       = "",
+          container = "",
+          node      = sys.env("HOSTNAME"),
+        }
+      }
+
+      forward_to = [loki.write.remote.receiver]
+    }
+
+    loki.write "remote" {
+      endpoint {
+        url = sys.env("LOKI_ENDPOINT")
+      }
+    }
+
+    // 4. Remote Write for Node Metrics
+    prometheus.remote_write "mimir_remote" {
+      endpoint {
+        url = sys.env("MIMIR_ENDPOINT")
+      }
+    }
