@@ -1,145 +1,145 @@
 <div align="center">
 
   <h1>observability-lgtm-stack</h1>
-  <p><strong>Enterprise LGTM Observability Stack (Grafana, Mimir, Tempo, Loki, Prometheus, Alloy) & OKE Telemetry</strong></p>
+  <p><strong>Stack de Observabilidad Empresarial LGTM (Grafana, Mimir, Tempo, Loki, Prometheus, Alloy) y Telemetría para OKE</strong></p>
 
   <p>
-    <img src="https://img.shields.io/badge/Visualization-Grafana_10-F46800?style=flat-square&logo=grafana&logoColor=white" alt="Grafana" />
-    <img src="https://img.shields.io/badge/Metrics-Mimir_%2B_Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white" alt="Metrics" />
+    <img src="https://img.shields.io/badge/Visualizaci%C3%B3n-Grafana_10-F46800?style=flat-square&logo=grafana&logoColor=white" alt="Grafana" />
+    <img src="https://img.shields.io/badge/M%C3%A9tricas-Mimir_%2B_Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white" alt="Métricas" />
     <img src="https://img.shields.io/badge/Logs-Grafana_Loki_3-FF7800?style=flat-square&logo=grafana&logoColor=white" alt="Loki" />
-    <img src="https://img.shields.io/badge/Tracing-Grafana_Tempo_2-326CE5?style=flat-square&logo=opentelemetry&logoColor=white" alt="Tempo" />
-    <img src="https://img.shields.io/badge/Agent-Grafana_Alloy-00557F?style=flat-square&logo=grafana&logoColor=white" alt="Alloy" />
-    <img src="https://img.shields.io/badge/Orchestration-Oracle_OKE-F80000?style=flat-square&logo=oracle&logoColor=white" alt="OKE" />
-    <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
+    <img src="https://img.shields.io/badge/Trazas-Grafana_Tempo_2-326CE5?style=flat-square&logo=opentelemetry&logoColor=white" alt="Tempo" />
+    <img src="https://img.shields.io/badge/Agente-Grafana_Alloy-00557F?style=flat-square&logo=grafana&logoColor=white" alt="Alloy" />
+    <img src="https://img.shields.io/badge/Orquestaci%C3%B3n-Oracle_OKE-F80000?style=flat-square&logo=oracle&logoColor=white" alt="OKE" />
+    <img src="https://img.shields.io/badge/Licencia-MIT-blue?style=flat-square" alt="Licencia" />
   </p>
 
 </div>
 
 ---
 
-### Overview
+### Descripción General
 
-`observability-lgtm-stack` provides an end-to-end, enterprise-grade telemetry platform unifying **Logs, Metrics, and Distributed Traces** (the three pillars of observability).
+`observability-lgtm-stack` es una plataforma integral de observabilidad empresarial que unifica los **tres pilares de la observabilidad moderna (Métricas, Logs y Trazas Distribuidas)** con correlación cruzada nativa.
 
-Designed to bridge local control-plane inspection with cloud-native Kubernetes workloads on **Oracle Container Engine for Kubernetes (OKE)**, this repository delivers:
-1. **Unified Docker Compose Control Plane:** Pre-wired instances of Grafana, Prometheus, Mimir, Loki, Tempo, and Grafana Alloy.
-2. **Native Cross-Correlation (The Holy Grail of SRE):**
-   - **Trace-to-Logs:** Inspect a span in Tempo and jump directly to the exact application logs in Loki matching the `trace_id`.
-   - **Trace-to-Metrics:** Jump from high-latency traces directly into RED service graphs in Mimir/Prometheus.
-3. **OKE DaemonSet Telemetry:** Production Kubernetes manifests deploying **Grafana Alloy** as a DaemonSet across OKE worker nodes to collect container logs from `/var/log/pods`, cAdvisor node metrics, and OTLP traces.
-4. **Automated Dashboard Bootstrapping:** Python automation script utilizing Grafana's REST API to immediately provision production dashboards upon startup.
+Diseñado para conectar el plano de control local con cargas de trabajo de nube en clústeres **Oracle Container Engine for Kubernetes (OKE)**, este repositorio proporciona:
+1. **Plano de Control Unificado en Docker Compose:** Instancias preconfiguradas e interconectadas de Grafana, Prometheus, Mimir, Loki, Tempo y Grafana Alloy.
+2. **Correlación Cruzada Nativa (Estándar SRE):**
+   - **Trazas a Logs:** Al inspeccionar una traza en Tempo, puedes saltar en un clic a las líneas de log exactas en Loki asociadas al `trace_id`.
+   - **Trazas a Métricas:** Desde trazas lentas se accede directamente a gráficas de latencia y tasa de errores en Prometheus/Mimir.
+3. **DaemonSet de Telemetría para OKE:** Manifiestos listos para producción que despliegan **Grafana Alloy** en cada worker node de OKE para recolectar logs de `/var/log/pods`, métricas de cAdvisor y trazas OTLP de aplicaciones.
+4. **Inicialización Automatizada de Dashboards:** Script en Python que utiliza la API REST de Grafana para aprovisionar automáticamente tableros de producción al arrancar.
 
 ---
 
-### End-to-End Telemetry Architecture
+### Arquitectura de Telemetría de Extremo a Extremo
 
 ```mermaid
 graph TD
-    subgraph OKECluster ["Oracle Cloud Infrastructure (OCI) // OKE Cluster"]
-        Apps[Fintech Microservices / Workloads] -->|OTLP Traces :4317| AlloyNode[Grafana Alloy DaemonSet]
-        NodePods["/var/log/pods/*/*.log"] -->|Pod Logs File Match| AlloyNode
-        Kubelet["cAdvisor / Kubelet Metrics :10250"] -->|Node Metrics Scrape| AlloyNode
+    subgraph OKECluster ["Oracle Cloud Infrastructure (OCI) // Clúster OKE"]
+        Apps[Microservicios Fintech / Cargas] -->|Trazas OTLP :4317| AlloyNode[Grafana Alloy DaemonSet]
+        NodePods["/var/log/pods/*/*.log"] -->|Ingesta de Logs de Pods| AlloyNode
+        Kubelet["Métricas cAdvisor / Kubelet :10250"] -->|Scraping de Nodos| AlloyNode
     end
 
-    subgraph ObservabilityHost ["LGTM Stack Engine (Docker Compose)"]
-        AlloyNode -->|Remote Push OTLP Traces| Tempo[Grafana Tempo :3200]
-        AlloyNode -->|Remote Push Structured Logs| Loki[Grafana Loki :3100]
-        AlloyNode -->|Remote Write TSDB Metrics| Mimir[Grafana Mimir :9009]
-        Prometheus[Prometheus Server :9090] -->|Remote Write| Mimir
+    subgraph ObservabilityHost ["Motor LGTM Stack (Docker Compose)"]
+        AlloyNode -->|Push Remoto de Trazas OTLP| Tempo[Grafana Tempo :3200]
+        AlloyNode -->|Push Remoto de Logs Estructurados| Loki[Grafana Loki :3100]
+        AlloyNode -->|Remote Write Métricas TSDB| Mimir[Grafana Mimir :9009]
+        Prometheus[Servidor Prometheus :9090] -->|Remote Write| Mimir
 
-        Mimir -->|Metrics Source| Grafana[Grafana Portal :3000]
-        Loki -->|Log Streams Source| Grafana
-        Tempo -->|Trace Queries Source| Grafana
+        Mimir -->|Origen de Métricas| Grafana[Portal Grafana :3000]
+        Loki -->|Origen de Logs| Grafana
+        Tempo -->|Origen de Trazas| Grafana
     end
 
-    Grafana -.->|Trace-to-Logs Correlation| Loki
-    Grafana -.->|Trace-to-Metrics Correlation| Mimir
+    Grafana -.->|Correlación Trazas a Logs| Loki
+    Grafana -.->|Correlación Trazas a Métricas| Mimir
 ```
 
 ---
 
-### Service Matrix & Port Allocations
+### Matriz de Servicios y Asignación de Puertos
 
-| Service | Container Name | Host Port | Protocol / Purpose |
+| Servicio | Contenedor | Puerto Host | Protocolo / Propósito |
 | :--- | :--- | :--- | :--- |
-| **Grafana** | `lgtm-grafana` | `3000` | Web UI & Visualization Dashboard |
-| **Prometheus** | `lgtm-prometheus` | `9090` | Real-time metric scraping & remote_write |
-| **Mimir** | `lgtm-mimir` | `9009` | High-scale long-term Prometheus storage |
-| **Loki** | `lgtm-loki` | `3100` | Microsecond LogQL log aggregation |
-| **Tempo** | `lgtm-tempo` | `3200` | TraceQL query interface |
-| **Tempo OTLP (gRPC)** | `lgtm-tempo` | `4317` | OpenTelemetry gRPC trace receiver |
-| **Tempo OTLP (HTTP)** | `lgtm-tempo` | `4318` | OpenTelemetry HTTP trace receiver |
-| **Grafana Alloy** | `lgtm-alloy` | `12345` | Alloy Agent pipeline health & UI |
+| **Grafana** | `lgtm-grafana` | `3000` | Interfaz Web y Dashboards de Visualización |
+| **Prometheus** | `lgtm-prometheus` | `9090` | Scraping de métricas en tiempo real y remote_write |
+| **Mimir** | `lgtm-mimir` | `9009` | Almacenamiento distribuido a largo plazo para Prometheus |
+| **Loki** | `lgtm-loki` | `3100` | Agregación y consultas de logs mediante LogQL |
+| **Tempo** | `lgtm-tempo` | `3200` | Consultas TraceQL y motor de trazas |
+| **Tempo OTLP (gRPC)** | `lgtm-tempo` | `4317` | Receptor gRPC de trazas OpenTelemetry |
+| **Tempo OTLP (HTTP)** | `lgtm-tempo` | `4318` | Receptor HTTP de trazas OpenTelemetry |
+| **Grafana Alloy** | `lgtm-alloy` | `12345` | Interfaz de estado del pipeline Alloy y telemetría |
 
 ---
 
-### Quickstart: Local Control-Plane (Docker)
+### Inicio Rápido: Plano Local con Docker
 
-#### 1. Launch the LGTM Stack
+#### 1. Iniciar el Stack LGTM
 
 ```bash
-# Clone the repository
+# Clonar el repositorio
 git clone https://github.com/NeoScraids/observability-lgtm-stack.git
 cd observability-lgtm-stack
 
-# Launch all unified containers
+# Iniciar todos los contenedores en segundo plano
 docker compose up -d
 ```
 
-Verify that all services are healthy:
+Verifica que todos los servicios estén en ejecución:
 
 ```bash
 docker compose ps
 ```
 
-#### 2. Bootstrap Production Dashboards
+#### 2. Inicializar Dashboards Automáticamente
 
-Execute the included Python automation script to verify Grafana readiness and import pre-configured dashboards:
+Ejecuta el script en Python incluido para verificar la disponibilidad de Grafana e importar los tableros preconfigurados:
 
 ```bash
 python scripts/bootstrap_dashboards.py
 ```
 
-#### 3. Access Grafana
+#### 3. Acceder a Grafana
 
-Navigate to [http://localhost:3000](http://localhost:3000) in your web browser:
-- **Default Username:** `admin`
-- **Default Password:** `admin`
-- **Pre-configured Data Sources:** `Mimir` (Default), `Loki`, `Tempo`, `Prometheus`.
+Abre tu navegador en [http://localhost:3000](http://localhost:3000):
+- **Usuario por defecto:** `admin`
+- **Contraseña por defecto:** `admin`
+- **Data Sources precargados:** `Mimir` (Predeterminado), `Loki`, `Tempo`, `Prometheus`.
 
 ---
 
-### Deploying Telemetry Agent to Oracle Kubernetes Engine (OKE)
+### Despliegue del Agente de Telemetría en Oracle Kubernetes Engine (OKE)
 
-To extract live node logs, container traces, and cluster metrics from an active OKE cluster into this observability stack:
+Para capturar logs de pods, trazas de microservicios y métricas de nodos de un clúster OKE activo:
 
-#### 1. Configure Target Endpoints
-Edit `k8s-oke/alloy-daemonset.yaml` with your accessible host endpoints:
+#### 1. Configurar los Endpoints de Destino
+Edita `k8s-oke/alloy-daemonset.yaml` con las direcciones accesibles de tu stack:
 
 ```yaml
 env:
   - name: TEMPO_ENDPOINT
-    value: "tempo.your-observability-domain.com:4317"
+    value: "tempo.tu-dominio-observabilidad.com:4317"
   - name: LOKI_ENDPOINT
-    value: "http://loki.your-observability-domain.com:3100/loki/api/v1/push"
+    value: "http://loki.tu-dominio-observabilidad.com:3100/loki/api/v1/push"
   - name: MIMIR_ENDPOINT
-    value: "http://mimir.your-observability-domain.com:9009/api/v1/push"
+    value: "http://mimir.tu-dominio-observabilidad.com:9009/api/v1/push"
 ```
 
-#### 2. Apply Manifests with `kubectl`
+#### 2. Aplicar Manifiestos con `kubectl`
 
 ```bash
-# Create dedicated namespace and RBAC permissions
+# Crear el namespace dedicado y permisos RBAC
 kubectl apply -f k8s-oke/rbac.yaml
 
-# Deploy the Alloy Agent ConfigMap (River configuration)
+# Desplegar el ConfigMap del agente Alloy (configuración en sintaxis River)
 kubectl apply -f k8s-oke/configmap-alloy.yaml
 
-# Deploy Alloy DaemonSet across all worker nodes
+# Desplegar el DaemonSet de Alloy en todos los worker nodes de OKE
 kubectl apply -f k8s-oke/alloy-daemonset.yaml
 ```
 
-Verify agent rollout across all cluster nodes:
+Verifica el despliegue del agente en todos los nodos:
 
 ```bash
 kubectl get pods -n observability -o wide
@@ -147,20 +147,20 @@ kubectl get pods -n observability -o wide
 
 ---
 
-### Dashboards Included
+### Tableros (Dashboards) Incluidos
 
 1. **`Cluster & Node Infrastructure Overview` (`cluster-overview`):**
-   - Live CPU Utilization (%) per node instance
-   - RAM memory saturation and available memory tracking
-   - Network I/O throughput (Rx/Tx) grouped by Kubernetes Namespace
+   - Utilización de CPU en tiempo real (%) por instancia de nodo
+   - Saturación de memoria RAM y seguimiento de memoria disponible
+   - Rendimiento de red (Rx/Tx) agrupado por namespace de Kubernetes
 2. **`RED Metrics & Distributed Tracing Correlator` (`red-metrics-traces`):**
-   - Rate (Requests per second) calculated from span metrics
-   - Errors (% Failure rate over total invocations)
-   - Duration (p95 latency histograms)
-   - Embedded Loki log streams with click-to-trace deep linking
+   - Tasa de peticiones por segundo (RPS) calculada a partir de span metrics
+   - Tasa de errores (% de fallos sobre el total de invocaciones)
+   - Duración y percentiles de latencia (histogramas p95)
+   - Visor de logs en vivo de Loki integrado con enlaces directos a trazas de Tempo
 
 ---
 
-### License
+### Licencia
 
-Distributed under the MIT License. Developed and maintained by [Brandon Mendieta](https://github.com/NeoScraids).
+Distribuido bajo la Licencia MIT. Desarrollado y mantenido por [Brandon Mendieta](https://github.com/NeoScraids).
