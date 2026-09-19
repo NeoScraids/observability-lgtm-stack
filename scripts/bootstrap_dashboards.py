@@ -5,6 +5,7 @@ Automated provisioning script that pushes enterprise production dashboards
 into a running Grafana instance via its REST API.
 """
 
+import argparse
 import base64
 import glob
 import json
@@ -17,6 +18,24 @@ import urllib.request
 GRAFANA_URL = os.getenv("GRAFANA_URL", "http://localhost:3000")
 GRAFANA_USER = os.getenv("GRAFANA_USER", "admin")
 GRAFANA_PASS = os.getenv("GRAFANA_PASSWORD", "admin")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Push Grafana dashboards from JSON files via the REST API."
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List dashboards that would be imported without actually pushing them.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=60,
+        help="Seconds to wait for Grafana to become healthy (default: 60).",
+    )
+    return parser.parse_args()
 
 
 def get_auth_header() -> str:
@@ -44,13 +63,19 @@ def wait_for_grafana(timeout: int = 60) -> bool:
     return False
 
 
-def import_dashboard(dashboard_path: str) -> bool:
+def import_dashboard(dashboard_path: str, dry_run: bool = False) -> bool:
     filename = os.path.basename(dashboard_path)
-    print(f"[*] Importing dashboard: {filename}...")
 
     with open(dashboard_path, "r", encoding="utf-8") as f:
         dashboard_content = json.load(f)
 
+    title = dashboard_content.get("title", filename)
+
+    if dry_run:
+        print(f"[dry-run] Would import: '{title}' ({filename})")
+        return True
+
+    print(f"[*] Importing dashboard: {filename}...")
     payload = {
         "dashboard": dashboard_content,
         "overwrite": True,
@@ -91,10 +116,11 @@ def import_dashboard(dashboard_path: str) -> bool:
 
 
 def main():
+    args = parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     dashboards_dir = os.path.join(script_dir, "dashboards")
 
-    if not wait_for_grafana(timeout=60):
+    if not args.dry_run and not wait_for_grafana(timeout=args.timeout):
         sys.exit(1)
 
     dashboard_files = glob.glob(os.path.join(dashboards_dir, "*.json"))
@@ -103,12 +129,16 @@ def main():
         sys.exit(1)
 
     print(f"[*] Found {len(dashboard_files)} dashboards to deploy.")
+    if args.dry_run:
+        print("[dry-run] No changes will be made to Grafana.")
+
     success_count = 0
     for file_path in dashboard_files:
-        if import_dashboard(file_path):
+        if import_dashboard(file_path, dry_run=args.dry_run):
             success_count += 1
 
-    print(f"\n[+] Provisioning complete: {success_count}/{len(dashboard_files)} dashboards active in Grafana.")
+    label = "listed" if args.dry_run else "active"
+    print(f"\n[+] Done: {success_count}/{len(dashboard_files)} dashboards {label} in Grafana.")
 
 
 if __name__ == "__main__":
